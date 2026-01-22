@@ -4,7 +4,6 @@ import {
   TrendingDown, 
   Activity, 
   DollarSign, 
-  Menu, 
   Bell, 
   Search,
   Zap
