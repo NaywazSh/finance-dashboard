@@ -13,9 +13,8 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
-// --- CONFIGURATION & EXPANDED DATA ---
+// --- CONFIGURATION & DATA ---
 
-// 1. Expanded Stock List (Simulated)
 const ALL_STOCKS = [
   { id: 'spx', name: 'S&P 500', symbol: 'SPX', price: 4783.45, change: 1.2, data: [4700, 4720, 4710, 4750, 4783] },
   { id: 'ndx', name: 'Nasdaq', symbol: 'NDX', price: 16832.92, change: -0.5, data: [16900, 16850, 16880, 16800, 16832] },
@@ -27,8 +26,6 @@ const ALL_STOCKS = [
   { id: 'amzn', name: 'Amazon', symbol: 'AMZN', price: 155.30, change: 1.5, data: [150, 152, 151, 154, 155] },
 ];
 
-// 2. Expanded Crypto List (For API)
-// We define the structure, but prices start at 0 until API loads
 const INITIAL_CRYPTO = [
   { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', price: 0, change: 0, data: [60000, 61000, 62000, 63000, 64000] },
   { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', price: 0, change: 0, data: [3000, 3100, 3200, 3300, 3400] },
@@ -124,44 +121,47 @@ export default function FinanceDashboard() {
   const [cryptos, setCryptos] = useState(INITIAL_CRYPTO);
   const [marketCap, setMarketCap] = useState(2.45);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // VIEW STATE: 'dashboard', 'all-stocks', 'all-crypto'
   const [view, setView] = useState('dashboard');
 
-  // API IDs for Crypto
-  const cryptoIds = INITIAL_CRYPTO.map(c => c.id).join(',');
-
-  // 1. FETCH REAL CRYPTO DATA
-  const fetchCrypto = async () => {
-    try {
-      const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cryptoIds}&vs_currencies=usd&include_24hr_change=true`);
-      const data = await response.json();
-      
-      setCryptos(prev => prev.map(coin => {
-        const apiData = data[coin.id];
-        if (!apiData) return coin;
-        
-        const newPrice = apiData.usd;
-        const newHistory = [...coin.data.slice(1), newPrice];
-        
-        return {
-          ...coin,
-          price: newPrice,
-          change: apiData.usd_24h_change || 0,
-          data: newHistory
-        };
-      }));
-      setIsLoading(false);
-    } catch (error) {
-      console.error("Error fetching crypto:", error);
-    }
-  };
-
-  // 2. SIMULATE LIVE TICKER
+  // --- FIXED: MOVED LOGIC INSIDE USEEFFECT TO PREVENT ERRORS ---
   useEffect(() => {
+    // 1. Define IDs
+    const cryptoIds = INITIAL_CRYPTO.map(c => c.id).join(',');
+
+    // 2. Define Fetch Function locally
+    const fetchCrypto = async () => {
+      try {
+        const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cryptoIds}&vs_currencies=usd&include_24hr_change=true`);
+        const data = await response.json();
+        
+        setCryptos(prev => prev.map(coin => {
+          const apiData = data[coin.id];
+          if (!apiData) return coin;
+          
+          const newPrice = apiData.usd;
+          const newHistory = [...coin.data.slice(1), newPrice];
+          
+          return {
+            ...coin,
+            price: newPrice,
+            change: apiData.usd_24h_change || 0,
+            data: newHistory
+          };
+        }));
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Error fetching crypto:", error);
+      }
+    };
+
+    // 3. Initial Call
     fetchCrypto();
 
-    const interval = setInterval(() => {
+    // 4. Set Interval for Crypto (every 30s)
+    const cryptoInterval = setInterval(fetchCrypto, 30000);
+
+    // 5. Set Interval for Stocks (every 3s)
+    const stockInterval = setInterval(() => {
       setStocks(currentStocks => currentStocks.map(stock => {
         const volatility = (Math.random() - 0.5) * 0.004; 
         const newPrice = stock.price * (1 + volatility);
@@ -171,13 +171,12 @@ export default function FinanceDashboard() {
       setMarketCap(prev => prev + (Math.random() - 0.5) * 0.01);
     }, 3000); 
 
-    const cryptoInterval = setInterval(fetchCrypto, 30000);
-
+    // 6. Cleanup on unmount
     return () => {
-      clearInterval(interval);
+      clearInterval(stockInterval);
       clearInterval(cryptoInterval);
     };
-  }, []);
+  }, []); // Empty dependency array is now completely valid
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans pb-20 md:pb-0">
@@ -199,7 +198,7 @@ export default function FinanceDashboard() {
         </div>
       </header>
 
-      {/* MARQUEE TICKER (Only show on dashboard) */}
+      {/* TICKER */}
       {view === 'dashboard' && (
         <div className="mt-16 bg-black py-2 overflow-hidden whitespace-nowrap border-b border-gray-800">
           <div className="inline-block pl-4">
@@ -211,13 +210,12 @@ export default function FinanceDashboard() {
         </div>
       )}
 
-      {/* MAIN CONTENT AREA */}
+      {/* MAIN CONTENT */}
       <main className={`max-w-7xl mx-auto p-4 md:p-6 space-y-8 ${view !== 'dashboard' ? 'mt-20' : ''}`}>
         
-        {/* --- VIEW: DASHBOARD --- */}
+        {/* --- DASHBOARD VIEW --- */}
         {view === 'dashboard' && (
           <>
-            {/* HERO */}
             <section>
               <h2 className="text-2xl font-bold mb-4">Market Overview</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -258,7 +256,6 @@ export default function FinanceDashboard() {
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Show only first 3 stocks */}
                 {stocks.slice(0, 3).map((stock) => (
                   <AssetCard key={stock.symbol} asset={stock} type="stock" />
                 ))}
@@ -279,14 +276,12 @@ export default function FinanceDashboard() {
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Show only first 2 cryptos */}
                 {cryptos.slice(0, 2).map((crypto) => (
                   <AssetCard key={crypto.symbol} asset={crypto} type="crypto" />
                 ))}
               </div>
             </section>
 
-            {/* OPPORTUNITIES */}
             <section>
               <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
                  <Zap className="text-purple-500" /> Smart Opportunities
@@ -300,7 +295,7 @@ export default function FinanceDashboard() {
           </>
         )}
 
-        {/* --- VIEW: ALL STOCKS --- */}
+        {/* --- ALL STOCKS VIEW --- */}
         {view === 'all-stocks' && (
           <section className="animate-fade-in">
             <div className="flex items-center gap-4 mb-6">
@@ -320,7 +315,7 @@ export default function FinanceDashboard() {
           </section>
         )}
 
-        {/* --- VIEW: ALL CRYPTO --- */}
+        {/* --- ALL CRYPTO VIEW --- */}
         {view === 'all-crypto' && (
           <section className="animate-fade-in">
             <div className="flex items-center gap-4 mb-6">
@@ -342,7 +337,6 @@ export default function FinanceDashboard() {
 
       </main>
 
-      {/* MOBILE BOTTOM NAV */}
       <nav className="fixed bottom-0 w-full bg-gray-900 border-t border-gray-800 p-4 md:hidden z-50">
         <div className="flex justify-around items-center">
           <button 
