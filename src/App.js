@@ -7,21 +7,37 @@ import {
   Bell, 
   Search,
   Zap,
-  RefreshCw
+  RefreshCw,
+  ArrowLeft,
+  List
 } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
-// --- CONFIGURATION ---
-// We start with baseline stock data, but the app will "wiggle" these numbers to simulate live trading.
-const INITIAL_STOCKS = [
+// --- CONFIGURATION & EXPANDED DATA ---
+
+// 1. Expanded Stock List (Simulated)
+const ALL_STOCKS = [
   { id: 'spx', name: 'S&P 500', symbol: 'SPX', price: 4783.45, change: 1.2, data: [4700, 4720, 4710, 4750, 4783] },
   { id: 'ndx', name: 'Nasdaq', symbol: 'NDX', price: 16832.92, change: -0.5, data: [16900, 16850, 16880, 16800, 16832] },
   { id: 'dji', name: 'Dow Jones', symbol: 'DJI', price: 37468.61, change: 0.8, data: [37200, 37300, 37250, 37400, 37468] },
+  { id: 'aapl', name: 'Apple Inc.', symbol: 'AAPL', price: 185.92, change: 0.5, data: [180, 182, 181, 184, 185] },
+  { id: 'tsla', name: 'Tesla, Inc.', symbol: 'TSLA', price: 219.91, change: -2.1, data: [230, 225, 228, 222, 219] },
+  { id: 'msft', name: 'Microsoft', symbol: 'MSFT', price: 390.20, change: 1.1, data: [380, 385, 382, 388, 390] },
+  { id: 'googl', name: 'Alphabet', symbol: 'GOOGL', price: 142.65, change: 0.3, data: [140, 141, 140, 142, 142] },
+  { id: 'amzn', name: 'Amazon', symbol: 'AMZN', price: 155.30, change: 1.5, data: [150, 152, 151, 154, 155] },
 ];
 
+// 2. Expanded Crypto List (For API)
+// We define the structure, but prices start at 0 until API loads
 const INITIAL_CRYPTO = [
   { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', price: 0, change: 0, data: [60000, 61000, 62000, 63000, 64000] },
   { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', price: 0, change: 0, data: [3000, 3100, 3200, 3300, 3400] },
+  { id: 'solana', name: 'Solana', symbol: 'SOL', price: 0, change: 0, data: [90, 92, 95, 98, 100] },
+  { id: 'ripple', name: 'XRP', symbol: 'XRP', price: 0, change: 0, data: [0.5, 0.52, 0.51, 0.53, 0.55] },
+  { id: 'cardano', name: 'Cardano', symbol: 'ADA', price: 0, change: 0, data: [0.45, 0.48, 0.47, 0.50, 0.52] },
+  { id: 'dogecoin', name: 'Dogecoin', symbol: 'DOGE', price: 0, change: 0, data: [0.07, 0.08, 0.075, 0.082, 0.08] },
+  { id: 'polkadot', name: 'Polkadot', symbol: 'DOT', price: 0, change: 0, data: [6, 6.5, 6.2, 6.8, 7] },
+  { id: 'matic-network', name: 'Polygon', symbol: 'MATIC', price: 0, change: 0, data: [0.7, 0.75, 0.72, 0.8, 0.85] },
 ];
 
 const opportunities = [
@@ -73,7 +89,6 @@ const AssetCard = ({ asset, type }) => {
       
       <div className="mt-4 flex justify-between items-end">
         <div>
-          {/* Animated pulsing effect on price update */}
           <p className="text-2xl font-bold text-white transition-all duration-300">
             ${asset.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
@@ -105,29 +120,34 @@ const OpportunityCard = ({ item }) => (
 );
 
 export default function FinanceDashboard() {
-  const [stocks, setStocks] = useState(INITIAL_STOCKS);
+  const [stocks, setStocks] = useState(ALL_STOCKS);
   const [cryptos, setCryptos] = useState(INITIAL_CRYPTO);
   const [marketCap, setMarketCap] = useState(2.45);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // VIEW STATE: 'dashboard', 'all-stocks', 'all-crypto'
+  const [view, setView] = useState('dashboard');
 
-  // 1. FETCH REAL CRYPTO DATA FROM API
+  // API IDs for Crypto
+  const cryptoIds = INITIAL_CRYPTO.map(c => c.id).join(',');
+
+  // 1. FETCH REAL CRYPTO DATA
   const fetchCrypto = async () => {
     try {
-      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true');
+      const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cryptoIds}&vs_currencies=usd&include_24hr_change=true`);
       const data = await response.json();
       
       setCryptos(prev => prev.map(coin => {
         const apiData = data[coin.id];
         if (!apiData) return coin;
         
-        // Update price and generate a slightly new chart point
         const newPrice = apiData.usd;
-        const newHistory = [...coin.data.slice(1), newPrice]; // Keep array length same
+        const newHistory = [...coin.data.slice(1), newPrice];
         
         return {
           ...coin,
           price: newPrice,
-          change: apiData.usd_24h_change,
+          change: apiData.usd_24h_change || 0,
           data: newHistory
         };
       }));
@@ -137,34 +157,20 @@ export default function FinanceDashboard() {
     }
   };
 
-  // 2. SIMULATE LIVE STOCK MARKET TICKER (Since Real Stock API keys are complex)
+  // 2. SIMULATE LIVE TICKER
   useEffect(() => {
-    // Initial Crypto Fetch
     fetchCrypto();
 
-    // Set up a timer to update prices every 3 seconds
     const interval = setInterval(() => {
-      
-      // Update Stocks (Simulation)
       setStocks(currentStocks => currentStocks.map(stock => {
-        // Random fluctuation between -0.2% and +0.2%
         const volatility = (Math.random() - 0.5) * 0.004; 
         const newPrice = stock.price * (1 + volatility);
         const newHistory = [...stock.data.slice(1), newPrice];
-        
-        return {
-          ...stock,
-          price: newPrice,
-          data: newHistory
-        };
+        return { ...stock, price: newPrice, data: newHistory };
       }));
-
-      // Update Market Cap (Simulation)
       setMarketCap(prev => prev + (Math.random() - 0.5) * 0.01);
+    }, 3000); 
 
-    }, 3000); // Runs every 3000ms (3 seconds)
-
-    // Poll Crypto API every 30 seconds (API rate limit friendly)
     const cryptoInterval = setInterval(fetchCrypto, 30000);
 
     return () => {
@@ -178,7 +184,7 @@ export default function FinanceDashboard() {
       
       {/* HEADER */}
       <header className="fixed top-0 w-full bg-gray-900/95 backdrop-blur-md border-b border-gray-800 z-50 px-4 py-3 flex justify-between items-center">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('dashboard')}>
           <div className="bg-blue-600 p-1.5 rounded-lg">
             <DollarSign className="text-white" size={20} />
           </div>
@@ -190,98 +196,159 @@ export default function FinanceDashboard() {
           {isLoading && <RefreshCw className="animate-spin text-blue-500" size={20} />}
           <Search className="text-gray-400 cursor-pointer hover:text-white" size={20} />
           <Bell className="text-gray-400 cursor-pointer hover:text-white" size={20} />
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500"></div>
         </div>
       </header>
 
-      {/* TICKER */}
-      <div className="mt-16 bg-black py-2 overflow-hidden whitespace-nowrap border-b border-gray-800">
-        <div className="inline-block pl-4">
-          <span className="mx-4 text-green-400">BTC ${cryptos[0].price.toLocaleString()}</span>
-          <span className="mx-4 text-green-400">ETH ${cryptos[1].price.toLocaleString()}</span>
-          <span className="mx-4 text-blue-400">SPX ${stocks[0].price.toFixed(2)}</span>
+      {/* MARQUEE TICKER (Only show on dashboard) */}
+      {view === 'dashboard' && (
+        <div className="mt-16 bg-black py-2 overflow-hidden whitespace-nowrap border-b border-gray-800">
+          <div className="inline-block pl-4">
+            <span className="mx-4 text-green-400">BTC ${cryptos[0].price.toLocaleString()}</span>
+            <span className="mx-4 text-green-400">ETH ${cryptos[1].price.toLocaleString()}</span>
+            <span className="mx-4 text-blue-400">SPX ${stocks[0].price.toFixed(2)}</span>
+            <span className="mx-4 text-blue-400">TSLA ${stocks[4].price.toFixed(2)}</span>
+          </div>
         </div>
-      </div>
+      )}
 
-      <main className="max-w-7xl mx-auto p-4 md:p-6 space-y-8">
+      {/* MAIN CONTENT AREA */}
+      <main className={`max-w-7xl mx-auto p-4 md:p-6 space-y-8 ${view !== 'dashboard' ? 'mt-20' : ''}`}>
         
-        {/* HERO */}
-        <section>
-          <h2 className="text-2xl font-bold mb-4">Market Overview</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2 bg-gradient-to-r from-blue-900/40 to-purple-900/40 border border-blue-500/30 rounded-2xl p-6 flex flex-col justify-center relative overflow-hidden">
-              <div className="absolute right-0 top-0 p-10 opacity-10 bg-blue-500 blur-3xl rounded-full w-32 h-32"></div>
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Total Market Cap</h1>
-              <p className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600 transition-all duration-500">
-                ${marketCap.toFixed(3)} Trillion
-              </p>
-              <p className="text-green-400 mt-2 flex items-center gap-2">
-                <TrendingUp size={16} /> Live Data Active
-              </p>
-            </div>
-            
-            <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700 flex flex-col justify-between">
-              <div>
-                <h3 className="text-gray-400">Fear & Greed Index</h3>
-                <span className="text-3xl font-bold text-green-500">74</span>
-                <span className="text-sm text-green-400 ml-2">Greed</span>
+        {/* --- VIEW: DASHBOARD --- */}
+        {view === 'dashboard' && (
+          <>
+            {/* HERO */}
+            <section>
+              <h2 className="text-2xl font-bold mb-4">Market Overview</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-2 bg-gradient-to-r from-blue-900/40 to-purple-900/40 border border-blue-500/30 rounded-2xl p-6 flex flex-col justify-center relative overflow-hidden">
+                  <div className="absolute right-0 top-0 p-10 opacity-10 bg-blue-500 blur-3xl rounded-full w-32 h-32"></div>
+                  <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Total Market Cap</h1>
+                  <p className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">
+                    ${marketCap.toFixed(3)} Trillion
+                  </p>
+                  <p className="text-green-400 mt-2 flex items-center gap-2">
+                    <TrendingUp size={16} /> Live Data Active
+                  </p>
+                </div>
+                <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700 flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-gray-400">Fear & Greed Index</h3>
+                    <span className="text-3xl font-bold text-green-500">74</span>
+                    <span className="text-sm text-green-400 ml-2">Greed</span>
+                  </div>
+                  <div className="w-full bg-gray-700 h-2 rounded-full mt-4 overflow-hidden">
+                    <div className="bg-green-500 h-full w-3/4 animate-pulse"></div>
+                  </div>
+                </div>
               </div>
-              <div className="w-full bg-gray-700 h-2 rounded-full mt-4 overflow-hidden">
-                <div className="bg-green-500 h-full w-3/4 animate-pulse"></div>
+            </section>
+
+            {/* STOCKS PREVIEW */}
+            <section>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Activity className="text-blue-500" /> US Indices
+                </h2>
+                <button 
+                  onClick={() => setView('all-stocks')}
+                  className="text-blue-400 text-sm font-semibold hover:text-blue-300 flex items-center gap-1 hover:bg-blue-900/30 px-3 py-1 rounded-full transition-all"
+                >
+                  See All <List size={14} />
+                </button>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Show only first 3 stocks */}
+                {stocks.slice(0, 3).map((stock) => (
+                  <AssetCard key={stock.symbol} asset={stock} type="stock" />
+                ))}
+              </div>
+            </section>
+
+            {/* CRYPTO PREVIEW */}
+            <section>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Activity className="text-orange-500" /> Crypto Assets
+                </h2>
+                <button 
+                  onClick={() => setView('all-crypto')}
+                  className="text-orange-400 text-sm font-semibold hover:text-orange-300 flex items-center gap-1 hover:bg-orange-900/30 px-3 py-1 rounded-full transition-all"
+                >
+                  See All <List size={14} />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Show only first 2 cryptos */}
+                {cryptos.slice(0, 2).map((crypto) => (
+                  <AssetCard key={crypto.symbol} asset={crypto} type="crypto" />
+                ))}
+              </div>
+            </section>
+
+            {/* OPPORTUNITIES */}
+            <section>
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                 <Zap className="text-purple-500" /> Smart Opportunities
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {opportunities.map((item, index) => (
+                  <OpportunityCard key={index} item={item} />
+                ))}
+              </div>
+            </section>
+          </>
+        )}
+
+        {/* --- VIEW: ALL STOCKS --- */}
+        {view === 'all-stocks' && (
+          <section className="animate-fade-in">
+            <div className="flex items-center gap-4 mb-6">
+              <button 
+                onClick={() => setView('dashboard')}
+                className="bg-gray-800 p-2 rounded-full hover:bg-gray-700 transition-colors"
+              >
+                <ArrowLeft size={24} />
+              </button>
+              <h1 className="text-2xl font-bold">All US Stocks & Indices</h1>
             </div>
-          </div>
-        </section>
-
-        {/* STOCKS (SIMULATED LIVE) */}
-        <section>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <Activity className="text-blue-500" /> US Indices (Live)
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {stocks.map((stock) => (
-              <AssetCard key={stock.symbol} asset={stock} type="stock" />
-            ))}
-          </div>
-        </section>
-
-        {/* CRYPTO (REAL API) */}
-        <section>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <Activity className="text-orange-500" /> Crypto Assets (Real-Time)
-            </h2>
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              Connected to CoinGecko
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {stocks.map((stock) => (
+                <AssetCard key={stock.symbol} asset={stock} type="stock" />
+              ))}
             </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {cryptos.map((crypto) => (
-              <AssetCard key={crypto.symbol} asset={crypto} type="crypto" />
-            ))}
-          </div>
-        </section>
+          </section>
+        )}
 
-        {/* OPPORTUNITIES */}
-        <section>
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-             <Zap className="text-purple-500" /> Smart Opportunities
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {opportunities.map((item, index) => (
-              <OpportunityCard key={index} item={item} />
-            ))}
-          </div>
-        </section>
+        {/* --- VIEW: ALL CRYPTO --- */}
+        {view === 'all-crypto' && (
+          <section className="animate-fade-in">
+            <div className="flex items-center gap-4 mb-6">
+              <button 
+                onClick={() => setView('dashboard')}
+                className="bg-gray-800 p-2 rounded-full hover:bg-gray-700 transition-colors"
+              >
+                <ArrowLeft size={24} />
+              </button>
+              <h1 className="text-2xl font-bold">All Crypto Assets</h1>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {cryptos.map((crypto) => (
+                <AssetCard key={crypto.symbol} asset={crypto} type="crypto" />
+              ))}
+            </div>
+          </section>
+        )}
 
       </main>
 
+      {/* MOBILE BOTTOM NAV */}
       <nav className="fixed bottom-0 w-full bg-gray-900 border-t border-gray-800 p-4 md:hidden z-50">
         <div className="flex justify-around items-center">
-          <button className="flex flex-col items-center text-blue-500">
+          <button 
+            className={`flex flex-col items-center ${view === 'dashboard' ? 'text-blue-500' : 'text-gray-500'}`}
+            onClick={() => setView('dashboard')}
+          >
             <Activity size={24} />
             <span className="text-[10px] mt-1">Markets</span>
           </button>
