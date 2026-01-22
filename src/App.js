@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   TrendingUp, 
   TrendingDown, 
+  Bitcoin, 
   Activity, 
   DollarSign, 
   Menu, 
@@ -11,7 +12,6 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
-// --- SAFE DATA ---
 const mockStockData = [
   { name: 'S&P 500', symbol: 'SPX', price: 4783.45, change: 1.2, data: [4700, 4720, 4710, 4750, 4783] },
   { name: 'Nasdaq', symbol: 'NDX', price: 16832.92, change: -0.5, data: [16900, 16850, 16880, 16800, 16832] },
@@ -29,30 +29,15 @@ const opportunities = [
   { title: "BTC Halving Event", risk: "High", potential: "+40%", tag: "Crypto" },
 ];
 
-// --- COMPONENTS ---
-
-// Simplified Chart to prevent crashing
-const MiniChart = ({ data, color }) => {
-  // Map data safely
-  const chartData = data ? data.map((val, i) => ({ i, val })) : [];
-  
-  return (
-    <div className="h-16 w-24" style={{ minHeight: '64px', minWidth: '96px' }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData}>
-          <Line 
-            type="monotone" 
-            dataKey="val" 
-            stroke={color} 
-            strokeWidth={2} 
-            dot={false} 
-            isAnimationActive={false} // Disable animation to prevent hydration mismatch
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  );
-};
+const MiniChart = ({ data, color }) => (
+  <div className="h-16 w-24">
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={data.map((val, i) => ({ i, val }))}>
+        <Line type="monotone" dataKey="val" stroke={color} strokeWidth={2} dot={false} />
+      </LineChart>
+    </ResponsiveContainer>
+  </div>
+);
 
 const AssetCard = ({ asset, type }) => {
   const isUp = asset.change >= 0;
@@ -63,7 +48,7 @@ const AssetCard = ({ asset, type }) => {
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-lg ${type === 'crypto' ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'}`}>
-            <Activity size={20} />
+            {type === 'crypto' ? <Bitcoin size={20} /> : <Activity size={20} />}
           </div>
           <div>
             <h3 className="font-bold text-white text-lg">{asset.symbol}</h3>
@@ -106,8 +91,6 @@ const OpportunityCard = ({ item }) => (
 export default function FinanceDashboard() {
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans pb-20 md:pb-0">
-      
-      {/* HEADER */}
       <header className="fixed top-0 w-full bg-gray-900/95 backdrop-blur-md border-b border-gray-800 z-50 px-4 py-3 flex justify-between items-center">
         <div className="flex items-center gap-2">
           <div className="bg-blue-600 p-1.5 rounded-lg">
@@ -124,18 +107,16 @@ export default function FinanceDashboard() {
         </div>
       </header>
 
-      {/* TICKER */}
       <div className="mt-16 bg-black py-2 overflow-hidden whitespace-nowrap border-b border-gray-800">
-        <div className="inline-block pl-4">
+        <div className="inline-block animate-marquee pl-4">
           <span className="mx-4 text-green-400">BTC $64,230 ▲ 4.5%</span>
           <span className="mx-4 text-green-400">SPX $4,783 ▲ 1.2%</span>
           <span className="mx-4 text-red-400">NDX $16,832 ▼ 0.5%</span>
+          <span className="mx-4 text-green-400">ETH $3,450 ▲ 2.1%</span>
         </div>
       </div>
 
       <main className="max-w-7xl mx-auto p-4 md:p-6 space-y-8">
-        
-        {/* HERO */}
         <section>
           <h2 className="text-2xl font-bold mb-4">Market Overview</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -162,7 +143,6 @@ export default function FinanceDashboard() {
           </div>
         </section>
 
-        {/* STOCKS */}
         <section>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2">
@@ -177,11 +157,10 @@ export default function FinanceDashboard() {
           </div>
         </section>
 
-        {/* CRYPTO */}
         <section>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2">
-              <Activity className="text-orange-500" /> Crypto Assets
+              <Bitcoin className="text-orange-500" /> Crypto Assets
             </h2>
             <button className="text-orange-400 text-sm hover:underline">View All</button>
           </div>
@@ -192,7 +171,6 @@ export default function FinanceDashboard() {
           </div>
         </section>
 
-        {/* OPPORTUNITIES */}
         <section>
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
              <Zap className="text-purple-500" /> Smart Opportunities
@@ -203,7 +181,6 @@ export default function FinanceDashboard() {
             ))}
           </div>
         </section>
-
       </main>
 
       <nav className="fixed bottom-0 w-full bg-gray-900 border-t border-gray-800 p-4 md:hidden z-50">
@@ -219,6 +196,14 @@ export default function FinanceDashboard() {
           <div className="relative -top-6 bg-blue-600 p-4 rounded-full shadow-lg shadow-blue-500/40 border-4 border-gray-900">
             <DollarSign className="text-white" size={24} />
           </div>
+          <button className="flex flex-col items-center text-gray-500 hover:text-white">
+            <TrendingUp size={24} />
+            <span className="text-[10px] mt-1">Portfolio</span>
+          </button>
+          <button className="flex flex-col items-center text-gray-500 hover:text-white">
+            <Menu size={24} />
+            <span className="text-[10px] mt-1">Menu</span>
+          </button>
         </div>
       </nav>
     </div>
